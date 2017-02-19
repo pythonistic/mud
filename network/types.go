@@ -46,7 +46,8 @@ func (client *Client) Handle(disconnectHandler func(*Client)) {
 
 		if n > 0 {
 			// push the message to the message handler channel
-			fmt.Printf("message: %s\n", b)
+			raw_message := b[0:n - 1]
+			fmt.Printf("message: %s\n", raw_message)
 		}
 	}
 
