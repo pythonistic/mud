@@ -13,6 +13,7 @@ var connectionPool []*Client = make([]*Client, 0)
 var connectionPoolMtx sync.Mutex = sync.Mutex{}
 var incomingMessages = make(chan Message)
 var removeClients = make(chan *Client)
+var newClients = make(chan net.Conn)
 
 func Listen(host string) {
 	listener, err := net.Listen("tcp", host)
@@ -24,8 +25,7 @@ func Listen(host string) {
 
 	listening = true
 
-	go handleIncomingMessages()
-	go handleRemoveClients()
+	go handler()
 
 	for listening {
 		// block until next connection
@@ -34,73 +34,78 @@ func Listen(host string) {
 		if err != nil {
 			fmt.Printf("ERROR: can't accept connection:  %v", err.Error())
 		} else {
-			// do something with the connection
-			client := &Client{
-				connection: conn,
-				connected: true,
-				loggedIn: false,
-				created: time.Now(),
-				toClientChan: make (chan Message),
-				removeClientChan: removeClients,
-				fromClientChan: incomingMessages,
-			}
-
-			connectionPoolMtx.Lock()
-
-			// notify all about the connection
-			connectMessage := Message{
-				kind: MT_CONNECT,
-				created: time.Now(),
-				content: client.String() + " connected",
-			}
-			for _, otherClient := range connectionPool {
-				otherClient.Write(connectMessage)
-			}
-
-			connectionPool = append(connectionPool, client)
-			connectionPoolMtx.Unlock()
-
-			// start the connection goroutine
-			go client.Handle()
+			newClients<- conn
 		}
 	}
 }
 
-func handleRemoveClients() {
-	println("started handleRemoveClients")
-	for client := range removeClients {
-		fmt.Printf("Asked to remove client: %s\n", client)
-		connectionPoolMtx.Lock()
-		disconnectMessage := Message{
-			created: time.Now(),
-			content: client.String() + " disconnected",
-			kind: MT_DISCONNECT,
+func handler() {
+	for {
+		select {
+		case client := <-removeClients:
+			removeClient(client)
+		case message := <-incomingMessages:
+			processMessage(message)
+		case conn := <-newClients:
+			createClient(conn)
 		}
-		for idx, clientToConsider := range connectionPool {
-			if clientToConsider == client {
-				connectionPool = append(connectionPool[0:idx], connectionPool[idx + 1:]...)
-				println("DEBUG: removed client from connection pool")
-				//break
-			} else {
-				clientToConsider.Write(disconnectMessage)
-			}
-		}
-		connectionPoolMtx.Unlock()
 	}
 }
 
-func handleIncomingMessages() {
+func removeClient(client *Client) {
+	fmt.Printf("Asked to remove client: %s\n", client)
+	connectionPoolMtx.Lock()
+	for idx, clientToConsider := range connectionPool {
+		if clientToConsider == client {
+			connectionPool = append(connectionPool[0:idx], connectionPool[idx + 1:]...)
+			println("DEBUG: removed client from connection pool")
+			break
+		}
+	}
+	connectionPoolMtx.Unlock()
+}
+
+func processMessage(message Message) {
 	println("started handleIncomingMessages")
-	for message := range incomingMessages {
-		fmt.Printf("got message: %s\n", message)
-		// stub out handling messages
-		// push the message to all the clients
-		connectionPoolMtx.Lock()
-		for _, client := range connectionPool {
-			client.Write(message)
-		}
-		connectionPoolMtx.Unlock()
+	fmt.Printf("got message: %s\n", message)
+	// stub out handling messages
+	// push the message to all the clients
+	connectionPoolMtx.Lock()
+	for _, client := range connectionPool {
+		client.Write(message)
 	}
+	connectionPoolMtx.Unlock()
+}
+
+func createClient(conn net.Conn) {
+	// do something with the connection
+	client := &Client{
+		connection: conn,
+		connected: true,
+		loggedIn: false,
+		created: time.Now(),
+		toClientChan: make (chan Message),
+		removeClientChan: removeClients,
+		fromClientChan: incomingMessages,
+	}
+
+	connectionPoolMtx.Lock()
+
+	// notify all about the connection
+	connectMessage := Message{
+		kind: MT_CONNECT,
+		created: time.Now(),
+		content: client.String() + " connected",
+	}
+	for _, otherClient := range connectionPool {
+		otherClient.Write(connectMessage)
+	}
+
+	connectionPool = append(connectionPool, client)
+	connectionPoolMtx.Unlock()
+
+	// start the connection goroutine
+	go client.Handle()
 }
 
 func shutdownConnections() {
