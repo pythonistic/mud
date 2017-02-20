@@ -4,7 +4,6 @@ import (
 	"net"
 	"time"
 	"fmt"
-	"sync"
 	"io"
 	"bytes"
 )
@@ -17,12 +16,12 @@ type Client struct {
 	connected bool
 	loggedIn bool
 	created time.Time
-	incomingMessage []byte
-	outgoingMessages [][]byte
-	outgoingMessagesMutex sync.Mutex
+	removeClientChan chan<- *Client
+	fromClientChan chan<- Message
+	toClientChan chan Message
 }
 
-func (client *Client) Handle(disconnectHandler func(*Client)) {
+func (client *Client) Handle() {
 	// create the writer goroutine
 	go client.writeMessages()
 
@@ -34,55 +33,58 @@ func (client *Client) Handle(disconnectHandler func(*Client)) {
 		// read from the client
 		var b [MAX_MESSAGE_SIZE]byte
 		n, err := client.connection.Read(b[0:])
-		print(n)
 		if err != nil {
 			if err != io.EOF {
 				fmt.Printf("WARN: error reading from client: %v\n", err.Error())
 			} else {
 				// close the connection
 				client.connected = false
-				fmt.Printf("INFO: client closd connection: %v\n", err.Error())
+				fmt.Printf("INFO: client closed connection: %v\n", err.Error())
 			}
 		}
 
 		if n > 0 {
 			// push the message to the message handler channel
 			raw_message := b[0:n - 1]
-			fmt.Printf("message: %s\n", raw_message)
+			fmt.Printf("message: %s - ", raw_message)
+			message := Message{
+				content: string(raw_message) + "\n",
+				created: time.Now(),
+				kind: MT_FROM_CLIENT,
+			}
+			print("pushing to chan - ")
+			client.fromClientChan <- message
+			println("pushed")
 		}
 	}
 
 	// force the client to close
+	println("Forcing client to close")
 	client.connection.Close()
 
 	// remove the client from the connection pool
-	disconnectHandler(client)
+	println("Telling channel to remove this connection")
+	client.removeClientChan <- client
 }
 
-func (client *Client) Write(msg string) {
-	b := []byte(msg)
-	client.outgoingMessagesMutex.Lock()
-	defer client.outgoingMessagesMutex.Unlock()
-	client.outgoingMessages = append(client.outgoingMessages, b)
+func (client *Client) Write(msg Message) {
+	client.toClientChan <- msg
 }
 
 func (client *Client) writeMessages() {
+	fmt.Printf("Started write messages for client %s\n", client)
 	for client.connected {
-		// we won't send more than one message per WRITE_SLEEP
-		time.Sleep(WRITE_SLEEP)
-
-		if len(client.outgoingMessages) > 0 {
+		select {
+		case msg := <-client.toClientChan:
+			fmt.Printf("Client got msg: %s\n", msg)
 			// get the next message to send
-			client.outgoingMessagesMutex.Lock()
-			b := client.outgoingMessages[0]
-			client.outgoingMessages = append(client.outgoingMessages[:0], client.outgoingMessages[1:]...)
-			client.outgoingMessagesMutex.Unlock()
 
 			// tcp connections make the logic to send partial messages unnecessary
 			// but if we ever send UDP, we'll be happy for this
 			start := 0
 			n := 0
 			var err error
+			b := msg.ToBytes()
 			for start < len(b) - 1 {
 				n, err = client.connection.Write(b[start:])
 				start += n
@@ -98,9 +100,8 @@ func (client *Client) writeMessages() {
 }
 
 func (client *Client) String() string {
-	return fmt.Sprintf("Client{connection=%s,connected=%t,loggedIn=%t,created=%s,outgoingMessages=%d}",
-		client.connection.RemoteAddr().String(), client.connected, client.loggedIn, client.created.String(),
-		len(client.outgoingMessages))
+	return fmt.Sprintf("Client{connection=%s,connected=%t,loggedIn=%t,created=%s}",
+		client.connection.RemoteAddr().String(), client.connected, client.loggedIn, client.created.String())
 }
 
 type MessageType uint8
@@ -113,6 +114,8 @@ const (
 	MT_TELL
 	MT_DESCRIPTION
 	MT_COMBAT
+	MT_DISCONNECT
+	MT_CONNECT
 	MT_OTHER
 )
 
