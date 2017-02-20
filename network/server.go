@@ -68,27 +68,24 @@ func Listen(host string) {
 
 func handleRemoveClients() {
 	println("started handleRemoveClients")
-	for {
-		select {
-		case client := <-removeClients:
-			fmt.Printf("Asked to remove client: %s\n", client)
-			connectionPoolMtx.Lock()
-			disconnectMessage := Message{
-				created: time.Now(),
-				content: client.String() + " disconnected",
-				kind: MT_DISCONNECT,
-			}
-			for idx, clientToConsider := range connectionPool {
-				if clientToConsider == client {
-					connectionPool = append(connectionPool[0:idx], connectionPool[idx + 1:]...)
-					println("DEBUG: removed client from connection pool")
-					//break
-				} else {
-					clientToConsider.Write(disconnectMessage)
-				}
-			}
-			connectionPoolMtx.Unlock()
+	for client := range removeClients {
+		fmt.Printf("Asked to remove client: %s\n", client)
+		connectionPoolMtx.Lock()
+		disconnectMessage := Message{
+			created: time.Now(),
+			content: client.String() + " disconnected",
+			kind: MT_DISCONNECT,
 		}
+		for idx, clientToConsider := range connectionPool {
+			if clientToConsider == client {
+				connectionPool = append(connectionPool[0:idx], connectionPool[idx + 1:]...)
+				println("DEBUG: removed client from connection pool")
+				//break
+			} else {
+				clientToConsider.Write(disconnectMessage)
+			}
+		}
+		connectionPoolMtx.Unlock()
 	}
 }
 
