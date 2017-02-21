@@ -39,3 +39,16 @@ func TestAccount_ComparePassword(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestGetLoginMessage(t *testing.T) {
+	ltp := loginTextPath
+	loginTextPath = "../" + loginTextPath
+	defer func() {
+		loginTextPath = ltp
+	}()
+	msg := GetLoginMessage()
+	if len(msg.Content) == 0 {
+		t.Error("Login message ewas empty")
+		t.FailNow()
+	}
+}

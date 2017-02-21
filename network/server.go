@@ -6,12 +6,14 @@ import (
 	"os"
 	"time"
 	"sync"
+	"mud/account"
+	"mud/message"
 )
 
 var listening bool
 var connectionPool []*Client = make([]*Client, 0)
-var connectionPoolMtx sync.Mutex = sync.Mutex{}
-var incomingMessages = make(chan Message)
+var connectionPoolMtx = sync.Mutex{}
+var incomingMessages = make(chan *message.Message)
 var removeClients = make(chan *Client)
 var newClients = make(chan net.Conn)
 
@@ -65,7 +67,7 @@ func removeClient(client *Client) {
 	connectionPoolMtx.Unlock()
 }
 
-func processMessage(message Message) {
+func processMessage(message *message.Message) {
 	println("started handleIncomingMessages")
 	fmt.Printf("got message: %s\n", message)
 	// stub out handling messages
@@ -84,28 +86,20 @@ func createClient(conn net.Conn) {
 		connected: true,
 		loggedIn: false,
 		created: time.Now(),
-		toClientChan: make (chan Message),
+		toClientChan: make (chan *message.Message),
 		removeClientChan: removeClients,
 		fromClientChan: incomingMessages,
 	}
 
 	connectionPoolMtx.Lock()
-
-	// notify all about the connection
-	connectMessage := Message{
-		kind: MT_CONNECT,
-		created: time.Now(),
-		content: client.String() + " connected",
-	}
-	for _, otherClient := range connectionPool {
-		otherClient.Write(connectMessage)
-	}
-
 	connectionPool = append(connectionPool, client)
 	connectionPoolMtx.Unlock()
 
 	// start the connection goroutine
 	go client.Handle()
+
+	// give the client the login screen
+	client.Write(account.GetLoginMessage())
 }
 
 func shutdownConnections() {

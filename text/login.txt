@@ -1,0 +1,12 @@
+#######################################
+##### Welcome                     #####
+#######################################
+
+To log into an existing account:
+    @login email@address.com password
+
+To create a new account:
+    @create email@address.com password
+
+To log out:
+    @quit
