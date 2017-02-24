@@ -86,6 +86,7 @@ func createClient(conn net.Conn) {
 		connected: true,
 		loggedIn: false,
 		created: time.Now(),
+		messageAdapter: AnsiAdapter,
 		toClientChan: make (chan *message.Message),
 		removeClientChan: removeClients,
 		fromClientChan: incomingMessages,

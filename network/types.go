@@ -11,11 +11,18 @@ import (
 const MAX_MESSAGE_SIZE = 4096
 const WRITE_SLEEP = time.Duration(10) * time.Millisecond
 
+type Adapter func(*message.Message) ([]byte);
+
+func BasicAdapter(msg *message.Message) []byte {
+	return msg.Content
+}
+
 type Client struct {
 	connection net.Conn
 	connected bool
 	loggedIn bool
 	created time.Time
+	messageAdapter Adapter
 	removeClientChan chan<- *Client
 	fromClientChan chan<- *message.Message
 	toClientChan chan *message.Message
@@ -75,7 +82,7 @@ func (client *Client) writeMessages() {
 			start := 0
 			n := 0
 			var err error
-			b := msg.ToBytes()
+			b := client.messageAdapter(msg)
 			for start < len(b) - 1 {
 				n, err = client.connection.Write(b[start:])
 				start += n
