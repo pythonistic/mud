@@ -1,24 +1,23 @@
-package account
+package network
 
 import (
 	"io/ioutil"
 	"fmt"
 	"time"
 	"sync"
-	"mud/message"
 )
 
 var maxLoginMessageAge = time.Duration(30) * time.Minute
-var loginMessage *message.Message
+var loginMessage *Message
 var loginMessageExpires time.Time
 var loginMessageMutex = sync.Mutex{}
 var loginTextPath = "text/login.txt"
 
-func GetLoginMessage() *message.Message {
+func GetLoginMessage() *Message {
 	loginMessageMutex.Lock()
 	defer loginMessageMutex.Unlock()
 	if loginMessage == nil || time.Now().After(loginMessageExpires) {
-		loginMessage = message.New(loginBanner(), message.MT_SYSTEM)
+		loginMessage = NewMessage(loginBanner(), MT_SYSTEM)
 		loginMessageExpires = time.Now().Add(maxLoginMessageAge)
 	}
 	return loginMessage

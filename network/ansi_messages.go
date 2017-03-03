@@ -2,43 +2,45 @@ package network
 
 import (
 	"github.com/mgutz/ansi"
-	"mud/message"
 )
 
-var tell = ansi.ColorFunc("magenta:white")
-var system = ansi.ColorFunc("blue:white")
-var connect = ansi.ColorFunc("white:black")
-var disconnect = ansi.ColorFunc("white:black")
-var combat = ansi.ColorFunc("red:white")
-var description = ansi.ColorFunc("black:white")
-var emote = ansi.ColorFunc("green:white")
-var other = ansi.ColorFunc("black:cyan")
-var say = ansi.ColorFunc("black:white")
+var colorizeTell = ansi.ColorFunc("magenta:white")
+var colorizeSystem = ansi.ColorFunc("blue:white")
+var colorizeConnect = ansi.ColorFunc("white:black")
+var colorizeDisconnect = ansi.ColorFunc("white:black")
+var colorizeCombat = ansi.ColorFunc("red:white")
+var colorizeDescription = ansi.ColorFunc("black:white")
+var colorizeEmote = ansi.ColorFunc("green:white")
+var colorizeOther = ansi.ColorFunc("black:cyan")
+var colorizeSay = ansi.ColorFunc("black:white")
+var colorizeError = ansi.ColorFunc("red+h:white+h")
 
-func AnsiAdapter(msg *message.Message) []byte {
+func AnsiAdapter(msg *Message) []byte {
 	content := string(msg.Content)
 
 	switch msg.Kind {
-	case message.MT_TELL:
-		content = tell(content)
-	case message.MT_SYSTEM:
-		content = system(content)
-	case message.MT_CONNECT:
-		content = connect(content)
-	case message.MT_DISCONNECT:
-		content = disconnect(content)
-	case message.MT_COMBAT:
-		content = combat(content)
-	case message.MT_DESCRIPTION:
-		content = description(content)
-	case message.MT_EMOTE:
-		content = emote(content)
-	case message.MT_OTHER:
-		content = other(content)
-	case message.MT_SAY:
-		content = say(content)
+	case MT_TELL:
+		content = colorizeTell(content)
+	case MT_SYSTEM:
+		content = colorizeSystem(content)
+	case MT_CONNECT:
+		content = colorizeConnect(content)
+	case MT_DISCONNECT:
+		content = colorizeDisconnect(content)
+	case MT_COMBAT:
+		content = colorizeCombat(content)
+	case MT_DESCRIPTION:
+		content = colorizeDescription(content)
+	case MT_EMOTE:
+		content = colorizeEmote(content)
+	case MT_OTHER:
+		content = colorizeOther(content)
+	case MT_SAY:
+		content = colorizeSay(content)
+	case MT_ERROR:
+		content = colorizeError(content)
 	default:
-		content = other(content)
+		content = colorizeOther(content)
 	}
 
 	return []byte(content)

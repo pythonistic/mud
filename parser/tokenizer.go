@@ -14,38 +14,38 @@ func TokenizeMessage(msg string) (command *Command) {
 		msgParts := strings.Split(msg, " ")
 
 		// identify the verb (always the first word)
-		command.verb = msgParts[0]
+		command.Verb = msgParts[0]
 
 		// populate the raw args
 		if len(msgParts) > 1 {
-			command.args = msgParts[1:]
-			command.argStr = strings.Join(command.args, " ")
+			command.Args = msgParts[1:]
+			command.ArgStr = strings.Join(command.Args, " ")
 
 			// populate the parameters for the verb
 			// the pattern is always dobj prep iobj
-			command.dobj = msgParts[1]
+			command.Dobj = msgParts[1]
 
 			if len(msgParts) > 2 {
 				// is the next part a preposition?
 				prepStr := msgParts[2]
 				iobjIndex := 2
 				if len(msgParts) > 3 {
-					prepStr = strings.Join(msgParts[2:3], " ")
-					if wordInList(DOUBLE_WORD_PREPOSITIONS, prepStr) {
-						command.prep = prepStr
+					doublePrepStr := strings.Join(msgParts[2:4], " ")
+
+					if wordInList(DOUBLE_WORD_PREPOSITIONS, doublePrepStr) {
+						command.Prep = doublePrepStr
 						iobjIndex = 4
 					}
 				}
-
-				if command.prep == "" {
+				if command.Prep == "" {
 					if wordInList(SINGLE_WORD_PREPOSITIONS, prepStr) {
-						command.prep = prepStr
+						command.Prep = prepStr
 						iobjIndex = 3
 					}
 				}
 
 				if len(msgParts) > iobjIndex {
-					command.iobj = strings.Join(msgParts[iobjIndex:], " ")
+					command.Iobj = strings.Join(msgParts[iobjIndex:], " ")
 				}
 			}
 		}

@@ -3,32 +3,28 @@ package network
 import (
 	"net"
 	"time"
-	"fmt"
 	"io"
-	"mud/message"
+	"fmt"
 )
 
-const MAX_MESSAGE_SIZE = 4096
 const WRITE_SLEEP = time.Duration(10) * time.Millisecond
-
-type Adapter func(*message.Message) ([]byte);
-
-func BasicAdapter(msg *message.Message) []byte {
-	return msg.Content
-}
 
 type Client struct {
 	connection net.Conn
 	connected bool
-	loggedIn bool
 	created time.Time
 	messageAdapter Adapter
 	removeClientChan chan<- *Client
-	fromClientChan chan<- *message.Message
-	toClientChan chan *message.Message
+	fromClientChan chan<- *Message
+	toClientChan chan *Message
+
+	// game state fields
+	LoggedIn bool
+	Account *Account
+	Location *Location
 }
 
-func (client *Client) Handle() {
+func (client *Client) IoLoop() {
 	// create the writer goroutine
 	go client.writeMessages()
 
@@ -51,13 +47,12 @@ func (client *Client) Handle() {
 
 		if n > 0 {
 			// push the message to the message handler channel
-			message := message.FromBytes(b[0:n - 1])
+			message := FromBytes(client, b[0:n - 1])
 			client.fromClientChan <- message
 		}
 	}
 
-	// force the client to close
-	println("Forcing client to close")
+	// dump any existing messages before closing
 	client.connection.Close()
 
 	// remove the client from the connection pool
@@ -65,8 +60,13 @@ func (client *Client) Handle() {
 	client.removeClientChan <- client
 }
 
-func (client *Client) Write(msg *message.Message) {
-	client.toClientChan <- msg
+func (client *Client) Write(msg *Message) {
+	// only push messages if the client is connected
+	if client.connected {
+		client.toClientChan <- msg
+	}
+
+	println("Discarded client message. Connection closed.")
 }
 
 func (client *Client) writeMessages() {
@@ -80,11 +80,9 @@ func (client *Client) writeMessages() {
 			// tcp connections make the logic to send partial messages unnecessary
 			// but if we ever send UDP, we'll be happy for this
 			start := 0
-			n := 0
-			var err error
 			b := client.messageAdapter(msg)
 			for start < len(b) - 1 {
-				n, err = client.connection.Write(b[start:])
+				n, err := client.connection.Write(b[start:])
 				start += n
 				if err != nil {
 					fmt.Printf("WARN: error writing to client: %v\n", err.Error())
@@ -99,5 +97,11 @@ func (client *Client) writeMessages() {
 
 func (client *Client) String() string {
 	return fmt.Sprintf("Client{connection=%s,connected=%t,loggedIn=%t,created=%s}",
-		client.connection.RemoteAddr().String(), client.connected, client.loggedIn, client.created.String())
+		client.connection.RemoteAddr().String(), client.connected, client.LoggedIn, client.created.String())
 }
+
+// Disconnect the client.
+func (client *Client) Disconnect() {
+	client.connected = false
+}
+

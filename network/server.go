@@ -6,14 +6,12 @@ import (
 	"os"
 	"time"
 	"sync"
-	"mud/account"
-	"mud/message"
 )
 
 var listening bool
 var connectionPool []*Client = make([]*Client, 0)
 var connectionPoolMtx = sync.Mutex{}
-var incomingMessages = make(chan *message.Message)
+var incomingMessages = make(chan *Message)
 var removeClients = make(chan *Client)
 var newClients = make(chan net.Conn)
 
@@ -47,7 +45,7 @@ func handler() {
 		case client := <-removeClients:
 			removeClient(client)
 		case message := <-incomingMessages:
-			processMessage(message)
+			HandleMessage(message)
 		case conn := <-newClients:
 			createClient(conn)
 		}
@@ -67,27 +65,15 @@ func removeClient(client *Client) {
 	connectionPoolMtx.Unlock()
 }
 
-func processMessage(message *message.Message) {
-	println("started handleIncomingMessages")
-	fmt.Printf("got message: %s\n", message)
-	// stub out handling messages
-	// push the message to all the clients
-	connectionPoolMtx.Lock()
-	for _, client := range connectionPool {
-		client.Write(message)
-	}
-	connectionPoolMtx.Unlock()
-}
-
 func createClient(conn net.Conn) {
 	// do something with the connection
 	client := &Client{
 		connection: conn,
 		connected: true,
-		loggedIn: false,
+		LoggedIn: false,
 		created: time.Now(),
 		messageAdapter: AnsiAdapter,
-		toClientChan: make (chan *message.Message),
+		toClientChan: make (chan *Message),
 		removeClientChan: removeClients,
 		fromClientChan: incomingMessages,
 	}
@@ -97,10 +83,7 @@ func createClient(conn net.Conn) {
 	connectionPoolMtx.Unlock()
 
 	// start the connection goroutine
-	go client.Handle()
-
-	// give the client the login screen
-	client.Write(account.GetLoginMessage())
+	go client.IoLoop()
 }
 
 func shutdownConnections() {

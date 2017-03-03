@@ -63,10 +63,10 @@ var DOUBLE_WORD_PREPOSITIONS = []string{
 }
 
 type Command struct {
-	verb	string
-	dobj	string
-	prep	string
-	iobj	string
-	args	[]string
-	argStr  string
+	Verb   string
+	Dobj   string
+	Prep   string
+	Iobj   string
+	Args   []string
+	ArgStr string
 }

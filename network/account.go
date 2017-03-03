@@ -1,9 +1,12 @@
-package account
+package network
 
 import (
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"strings"
 )
+
+const PASSWORD_COST = 12
 
 type Account struct {
 	email string
@@ -26,7 +29,7 @@ func (acct *Account) ComparePassword(candidate string) bool {
 	}
 }
 
-func New(email, rawPassword string) (acct *Account) {
+func NewAccount(email, rawPassword string) (acct *Account) {
 	hash, err := hashPassword(email, rawPassword)
 	if err != nil {
 		fmt.Printf("WARN: failed to create account for email %s: %v\n", email, err.Error())
@@ -37,4 +40,13 @@ func New(email, rawPassword string) (acct *Account) {
 		password: hash,
 	}
 	return
+}
+
+func buildPassword(email, rawPassword string) []byte {
+	return []byte(strings.TrimSpace(rawPassword) + strings.ToLower(strings.TrimSpace(email)))
+}
+
+func hashPassword(email, rawPassword string) ([]byte, error) {
+	password := buildPassword(email, rawPassword)
+	return bcrypt.GenerateFromPassword(password, PASSWORD_COST)
 }

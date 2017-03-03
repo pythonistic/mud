@@ -1,9 +1,16 @@
-package message
+package network
 
 import (
 	"time"
 	"fmt"
 )
+
+const MAX_MESSAGE_SIZE = 4096
+type Adapter func(*Message) ([]byte);
+
+func BasicAdapter(msg *Message) []byte {
+	return msg.Content
+}
 
 type MessageType uint8
 const (
@@ -17,6 +24,7 @@ const (
 	MT_COMBAT
 	MT_DISCONNECT
 	MT_CONNECT
+	MT_ERROR
 	MT_OTHER
 )
 
@@ -42,6 +50,8 @@ func (mt MessageType) String() string {
 		return "DISCONNECT"
 	case MT_CONNECT:
 		return "CONNECT"
+	case MT_ERROR:
+		return "ERROR"
 	case MT_OTHER:
 		return "OTHER"
 	}
@@ -53,6 +63,7 @@ type Message struct {
 	Kind    MessageType
 	Created time.Time
 	Content []byte
+	Client  *Client
 }
 
 func (m *Message) ToBytes() []byte {
@@ -64,19 +75,21 @@ func (m *Message) String() string {
 	return fmt.Sprintf("Message{kind=%s,created=%s,content=%s}", m.Kind, m.Created, m.Content)
 }
 
-func FromBytes(b []byte) *Message {
+func FromBytes(client *Client, b []byte) *Message {
 	m := &Message{
 		Kind: MT_FROM_CLIENT,
 		Created: time.Now(),
 		Content: b,
+		Client: client,
 	}
 	return m
 }
 
-func New(content []byte, kind MessageType) *Message {
+func NewMessage(content []byte, kind MessageType) *Message {
 	return &Message{
 		Content: content,
 		Created: time.Now(),
 		Kind: kind,
 	}
 }
+
